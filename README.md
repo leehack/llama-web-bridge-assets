@@ -5,8 +5,14 @@ Versioned JavaScript/WASM artifacts for `leehack/llama-web-bridge`.
 Primary files:
 
 - `llama_webgpu_bridge.js`
+- `llama_webgpu_bridge_worker.js`
 - `llama_webgpu_core.js`
 - `llama_webgpu_core.wasm`
+
+Optional memory64 files (published in modern tags):
+
+- `llama_webgpu_core_mem64.js`
+- `llama_webgpu_core_mem64.wasm`
 
 Metadata files:
 
