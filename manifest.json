@@ -1,9 +1,9 @@
 {
-  "bridge_assets_tag": "v0.1.9",
+  "bridge_assets_tag": "v0.1.10",
   "source_repository": "leehack/llama-web-bridge",
   "source_commit": "a5317b1d9916214613a8e9f65001525b8fc20e4e",
   "llama_cpp_tag": "b8216",
-  "generated_at_utc": "2026-03-06T21:17:16Z",
+  "generated_at_utc": "2026-03-08T14:27:20Z",
   "files": {
     "llama_webgpu_bridge.js": {
       "size_bytes": 158797,
