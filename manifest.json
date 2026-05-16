@@ -1,33 +1,37 @@
 {
-  "bridge_assets_tag": "v0.1.15",
+  "bridge_assets_tag": "v0.1.16",
   "source_repository": "leehack/llama-web-bridge",
-  "source_commit": "f26a8195e15e06732f5afa8d2fb9c0074246f99c",
-  "llama_cpp_tag": "b9116",
-  "generated_at_utc": "2026-05-13T02:06:30Z",
+  "source_commit": "99b163f576ce5dd3f41fefa69a78cd4b3e3bfb71",
+  "llama_cpp_tag": "b9165",
+  "generated_at_utc": "2026-05-16T11:15:39Z",
   "files": {
     "llama_webgpu_bridge.js": {
-      "size_bytes": 173019,
-      "sha256": "4867920227749411cd5c82ef08e2344ba7e9b51a6e9734c8f0d33b7955d12e7f"
+      "size_bytes": 166413,
+      "sha256": "1343c6b5fef9d41d798633c4943362681c6d576bdbb1bf8e522bdf8be8e1eb45"
     },
     "llama_webgpu_bridge_worker.js": {
-      "size_bytes": 94,
-      "sha256": "83c466f5ab07de9538b45f13e7d5d5051897f5d16644e2d42470aada1531c514"
+      "size_bytes": 257,
+      "sha256": "47bbfa0fe897e708455b9497e9aa41d2e94489c329300c33b12936fb3169deca"
+    },
+    "llama_webgpu_bridge.d.ts": {
+      "size_bytes": 4059,
+      "sha256": "0f6d83abaf581930de06b05088c7481bca8505f284c90261e3691e3dd097b1f8"
     },
     "llama_webgpu_core.js": {
       "size_bytes": 112776,
       "sha256": "f647a65a71f66009b7df08b8ec940337edead0274e201dd2dc4426e336d6ef42"
     },
     "llama_webgpu_core.wasm": {
-      "size_bytes": 6983705,
-      "sha256": "5c0560a7d0dda311eacd95d2311dfb6291f115ff41bc4584e2c01c07b5f72f1b"
+      "size_bytes": 7029601,
+      "sha256": "d4539a549e71a1c04d66f3220cfe0a389fac15ebe068a7b4de2dcdd1f19b0550"
     },
     "llama_webgpu_core_mem64.js": {
       "size_bytes": 128653,
-      "sha256": "aa9cd1408d08598c2d3495a5ccb8a4f9aa19b400e49731607da95e071fa35395"
+      "sha256": "05f34cc1a906338e1ee66a50e8a767493cbb80ec74376a5708ce1863e1a0c22e"
     },
     "llama_webgpu_core_mem64.wasm": {
-      "size_bytes": 7178353,
-      "sha256": "448b22b5940e9622ed9e6d5e984b0e52550289d8369ff7047fcf9dddaabe42e1"
+      "size_bytes": 7225226,
+      "sha256": "7dad781a40e15aa36bf7b762f050b789d9c0842f9ad4326bf29a6a42130b91de"
     }
   }
 }
