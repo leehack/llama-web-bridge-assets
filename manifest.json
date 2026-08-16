@@ -1,13 +1,13 @@
 {
-  "bridge_assets_tag": "v0.1.29",
+  "bridge_assets_tag": "v0.1.30",
   "source_repository": "leehack/llama-web-bridge",
-  "source_commit": "8d815a76b6df26684a7e3df5fd5b5be84608a8a1",
+  "source_commit": "2d61d8c8ebec9302433b5b7295c54de7c8e5b660",
   "llama_cpp_tag": "b10448",
-  "generated_at_utc": "2026-08-16T10:15:48Z",
+  "generated_at_utc": "2026-08-16T22:12:12Z",
   "files": {
     "llama_webgpu_bridge.js": {
-      "size_bytes": 166413,
-      "sha256": "1343c6b5fef9d41d798633c4943362681c6d576bdbb1bf8e522bdf8be8e1eb45"
+      "size_bytes": 166220,
+      "sha256": "bc5045a6378b6b55b1f7c5fea03b32d85f0b7e4565c7319a3dd90150fb5be63f"
     },
     "llama_webgpu_bridge_worker.js": {
       "size_bytes": 257,
