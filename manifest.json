@@ -1,37 +1,37 @@
 {
-  "bridge_assets_tag": "v0.1.32",
+  "bridge_assets_tag": "v0.1.33",
   "source_repository": "leehack/llama-web-bridge",
-  "source_commit": "fd23aad778fbb961ba75503e0ea07385bdee335a",
+  "source_commit": "4356364104103647139eb39253f445b1324e5df1",
   "llama_cpp_tag": "b10453",
-  "generated_at_utc": "2026-08-18T02:12:04Z",
+  "generated_at_utc": "2026-08-19T01:00:21Z",
   "files": {
     "llama_webgpu_bridge.js": {
-      "size_bytes": 166220,
-      "sha256": "bc5045a6378b6b55b1f7c5fea03b32d85f0b7e4565c7319a3dd90150fb5be63f"
+      "size_bytes": 176429,
+      "sha256": "18efcce2efcb448048ad7ccd336e0819adbd3501db16e939ed36a72e54e975b8"
     },
     "llama_webgpu_bridge_worker.js": {
       "size_bytes": 257,
       "sha256": "47bbfa0fe897e708455b9497e9aa41d2e94489c329300c33b12936fb3169deca"
     },
     "llama_webgpu_bridge.d.ts": {
-      "size_bytes": 4059,
-      "sha256": "0f6d83abaf581930de06b05088c7481bca8505f284c90261e3691e3dd097b1f8"
+      "size_bytes": 5191,
+      "sha256": "8a23d3269ae49ad5824ef812aeeb675419ab839f434ffbc11828080344a2f939"
     },
     "llama_webgpu_core.js": {
-      "size_bytes": 113113,
-      "sha256": "fbdcf2488570a6a77454203cb06f24ed20a03bee0c78d168bc55f72cc2234381"
+      "size_bytes": 113960,
+      "sha256": "71b1f71632856481bcb5f8233d59026510714a8ae5b4404376ddd41e8830e617"
     },
     "llama_webgpu_core.wasm": {
-      "size_bytes": 8397433,
-      "sha256": "738365baf36b4c1ac3aac9c252f2ddc29cbb6215cb168eb41fbbaea56eddab7e"
+      "size_bytes": 8489358,
+      "sha256": "d79d354a005b6c66f7a71657f5c4b74118542e83c2de5582ee7c9094ee4b05e1"
     },
     "llama_webgpu_core_mem64.js": {
-      "size_bytes": 130072,
-      "sha256": "21479a7399b344c9f9b3c98df1d6e6db8338edcf6fdefe5ddafb7edb0aaad2ab"
+      "size_bytes": 131043,
+      "sha256": "ac7b1452dcbf8e6322fedbbacc7a59737594d46f94153efab3ca4989b4b783c4"
     },
     "llama_webgpu_core_mem64.wasm": {
-      "size_bytes": 8611677,
-      "sha256": "846d70707289009dad2d5519cd1bb5e79e154a0deb486e2d441708783ecb2f72"
+      "size_bytes": 8708420,
+      "sha256": "6f7ecebff43648021f286c8c7efa43bc59516c432ff5a409338e8c9239af09b5"
     }
   }
 }
