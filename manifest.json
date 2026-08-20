@@ -1,9 +1,9 @@
 {
-  "bridge_assets_tag": "v0.1.36",
+  "bridge_assets_tag": "v0.1.37",
   "source_repository": "leehack/llama-web-bridge",
-  "source_commit": "b8cd7b856f7d79d776aadf8ebfb1ea45f18f5175",
-  "llama_cpp_tag": "b10507",
-  "generated_at_utc": "2026-08-20T11:06:20Z",
+  "source_commit": "909f14eee6f91f322b6e39d5f4c38e4762d9edf4",
+  "llama_cpp_tag": "b10514",
+  "generated_at_utc": "2026-08-20T17:29:29Z",
   "files": {
     "llama_webgpu_bridge.js": {
       "size_bytes": 177570,
@@ -18,20 +18,20 @@
       "sha256": "8a23d3269ae49ad5824ef812aeeb675419ab839f434ffbc11828080344a2f939"
     },
     "llama_webgpu_core.js": {
-      "size_bytes": 113960,
-      "sha256": "f4b4d0e12d2ba3d2f8236b6318d5c94d3b3a91ec9179bbfb2f2ef90a1f820057"
+      "size_bytes": 113962,
+      "sha256": "d282a57d2de9cd3835ecc999374bcc9ef00d6df32da0f47744ea672977c86f32"
     },
     "llama_webgpu_core.wasm": {
-      "size_bytes": 8528253,
-      "sha256": "9a1c16970a8f0dde387574c0c4c240924358a2a71139fa97f2cf36dc22c2799d"
+      "size_bytes": 8539935,
+      "sha256": "d2518cb3fefab2d048bb4dc42f768220fb795dd3c7145cc8e6ef9e6a375d3db7"
     },
     "llama_webgpu_core_mem64.js": {
-      "size_bytes": 131043,
-      "sha256": "ac7b1452dcbf8e6322fedbbacc7a59737594d46f94153efab3ca4989b4b783c4"
+      "size_bytes": 131045,
+      "sha256": "451ed2bfc99fc33e0de6b09eb96f03914a194c91bcd0bda968048c2d5efa7e2d"
     },
     "llama_webgpu_core_mem64.wasm": {
-      "size_bytes": 8747583,
-      "sha256": "b0ee2af872fed75eb3081eaf34a043aaba5aa75ec700ee55662cc35565af3af9"
+      "size_bytes": 8759721,
+      "sha256": "33596a7fb73710c34b11aba5dbe7cab3b056aeb3469e02bba76d92d113ae0006"
     }
   }
 }
