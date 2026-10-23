@@ -132,6 +132,80 @@ function embeddingCoreError(rc, version = embeddingAssetVersion()) {
   return new EmbeddingError(code, message);
 }
 
+// js/src/internal/text.ts
+function withoutNul(value, name) {
+  if (value.includes("\0")) {
+    throw new TypeError(`${name} contains U+0000, which the core cannot read.`);
+  }
+  return value;
+}
+function buildPromptFromMessages(messages, addAssistant) {
+  const lines = [];
+  for (const msg of messages || []) {
+    const role = String(msg?.role ?? "user");
+    const content = String(msg?.content ?? "");
+    lines.push(`${role}: ${content}`);
+  }
+  if (addAssistant) {
+    lines.push("assistant: ");
+  }
+  return lines.join("\n");
+}
+function looksLikeCorruptedGeneration(text) {
+  if (typeof text !== "string" || text.length === 0) {
+    return false;
+  }
+  const normalized = text.trim();
+  if (normalized.length === 0) {
+    return false;
+  }
+  const unusedTokens = text.match(/<unused\d+>/g) || [];
+  if (unusedTokens.length >= 4) {
+    return true;
+  }
+  const tokenLikeTags = text.match(/<[^>]{1,40}>/g) || [];
+  if (tokenLikeTags.length >= 8) {
+    return true;
+  }
+  const compact = text.replace(/\s+/g, "");
+  if (compact.length === 0) {
+    return false;
+  }
+  const tagRun = compact.match(/(?:<[^>]{2,32}>){6,}/);
+  if (tagRun) {
+    return true;
+  }
+  const alphaNum = (normalized.match(/[A-Za-z0-9]/g) || []).length;
+  const printable = (normalized.match(/[\x20-\x7E]/g) || []).length;
+  const angleBrackets = (normalized.match(/[<>]/g) || []).length;
+  const alphaNumRatio = alphaNum / normalized.length;
+  const printableRatio = printable / normalized.length;
+  const bracketRatio = angleBrackets / normalized.length;
+  if (normalized.length >= 24 && printableRatio > 0.95 && alphaNumRatio < 0.18) {
+    return true;
+  }
+  if (normalized.length >= 24 && bracketRatio > 0.25) {
+    return true;
+  }
+  return false;
+}
+function trimUnstableUtf8Tail(text) {
+  if (typeof text !== "string" || text.length === 0) {
+    return "";
+  }
+  let end = text.length;
+  while (end > 0 && text.charCodeAt(end - 1) === 65533) {
+    end -= 1;
+  }
+  if (end > 0) {
+    const tail = text.charCodeAt(end - 1);
+    if (tail >= 55296 && tail <= 56319) {
+      end -= 1;
+    }
+  }
+  return end === text.length ? text : text.slice(0, end);
+}
+
 // js/src/internal/completion_options.ts
 var SPECULATIVE_DECODING_STRATEGIES = Object.freeze([
   "draft-simple",
@@ -154,6 +228,7 @@ var NO_COMPLETION_CAPABILITIES = Object.freeze({
   presencePenalty: false,
   minP: false,
   thinkingBudget: false,
+  penaltyPromptTokens: false,
   speculativeDecoding: Object.freeze(speculativeFlags(() => false))
 });
 var MAX_NGRAM_SIZE = 65535;
@@ -173,7 +248,7 @@ function tag(budget, name) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new TypeError(`CompletionOptions.thinkingBudget.${name} must be a non-empty string.`);
   }
-  return value;
+  return withoutNul(value, `CompletionOptions.thinkingBudget.${name}`);
 }
 function thinkingBudget(value, hasMediaParts) {
   if (value == null) {
@@ -195,6 +270,7 @@ function thinkingBudget(value, hasMediaParts) {
   if (typeof forcedMessage !== "string") {
     throw new TypeError("CompletionOptions.thinkingBudget.forcedMessage must be a string.");
   }
+  withoutNul(forcedMessage, "CompletionOptions.thinkingBudget.forcedMessage");
   if (hasMediaParts) {
     throw new Error("CompletionOptions.thinkingBudget supports text-only prompts; remove the media parts.");
   }
@@ -345,13 +421,26 @@ function speculativeDecoding(value, conflicts) {
     ngramCacheDynamic
   };
 }
+function penaltyPromptTokens(value) {
+  if (value == null) {
+    return true;
+  }
+  if (typeof value !== "boolean") {
+    throw new TypeError(`CompletionOptions.penaltyPromptTokens must be a boolean; got ${String(value)}.`);
+  }
+  return value;
+}
 function resolveCompletionSamplingOptions(options) {
   const hasMediaParts = Array.isArray(options?.parts) && options.parts.length > 0;
+  if (typeof options?.grammar === "string") {
+    withoutNul(options.grammar, "CompletionOptions.grammar");
+  }
   const budget = thinkingBudget(options?.thinkingBudget, hasMediaParts);
   return {
     minP: optionalNumber(options?.minP, "minP", (value) => value >= 0 && value <= 1, " from 0 to 1") ?? 0,
     presencePenalty: optionalNumber(options?.presencePenalty, "presencePenalty", () => true, "") ?? 0,
     thinkingBudget: budget,
+    penaltyPromptTokens: penaltyPromptTokens(options?.penaltyPromptTokens),
     speculative: speculativeDecoding(options?.speculativeDecoding, {
       hasMediaParts,
       hasGrammar: typeof options?.grammar === "string" && options.grammar.length > 0,
@@ -371,6 +460,7 @@ function completionCapabilitiesFrom(raw) {
     presencePenalty: parsed?.presencePenalty === true,
     minP: parsed?.minP === true,
     thinkingBudget: parsed?.thinkingBudget === true,
+    penaltyPromptTokens: parsed?.penaltyPromptTokens === true,
     speculativeDecoding: speculativeFlags((strategy) => speculative?.[strategy] === true)
   };
 }
@@ -391,6 +481,9 @@ function requireCompletionCapabilities(sampling, capabilities) {
 // js/src/internal/constants.ts
 var defaultModelCacheName = "llamadart-webgpu-model-cache-v1";
 var BRIDGE_DISPOSED_MESSAGE = "Bridge has been disposed.";
+function bridgeDisposedError() {
+  return Object.assign(new Error(BRIDGE_DISPOSED_MESSAGE), { code: "disposed" });
+}
 var GENERATION_ALREADY_ACTIVE_RC = -7;
 var GENERATION_ALREADY_ACTIVE_MESSAGE = "Generation is already active on this bridge runtime.";
 var INVALID_GRAMMAR_ERROR_TEXT = "Failed to initialize sampler chain (invalid grammar)";
@@ -452,23 +545,73 @@ function isInt32(value) {
 // js/src/internal/decision.ts
 var DECISION_API_VERSION = 1;
 var DECISION_WORKER_TIMEOUT_PER_SEQUENCE_MS = 60 * 1e3;
+var DECISION_ERROR_CODES = /* @__PURE__ */ new Set([
+  "head-lost",
+  "no-model",
+  "disposed",
+  "cancelled",
+  "busy",
+  "context",
+  "invalid-argument",
+  "unsupported",
+  "model",
+  "inference",
+  "invalid-state",
+  "runtime"
+]);
+var CORE_STATUS_CODES = {
+  [-1]: "invalid-argument",
+  [-2]: "unsupported",
+  [-3]: "invalid-state",
+  [-4]: "model",
+  [-5]: "context",
+  [-6]: "inference",
+  [-7]: "busy",
+  [-8]: "head-lost",
+  [-9]: "no-model"
+};
+function isDecisionErrorCode(value) {
+  return DECISION_ERROR_CODES.has(value);
+}
+function decisionErrorCodeOf(error) {
+  const code = error && typeof error === "object" ? error.code : void 0;
+  return isDecisionErrorCode(code) ? code : null;
+}
+function withDecisionErrorCode(error, code) {
+  Object.defineProperty(error, "code", {
+    value: code,
+    writable: true,
+    enumerable: true,
+    configurable: true
+  });
+  return error;
+}
+function decisionError(code, message) {
+  return withDecisionErrorCode(new Error(message), code);
+}
+function decisionCoreStatusCode(status) {
+  return CORE_STATUS_CODES[status] ?? "runtime";
+}
+function invalidDecisionArgument(message) {
+  return withDecisionErrorCode(new TypeError(message), "invalid-argument");
+}
 function decisionHandleFrom(handle) {
   if (!isInt32(handle) || handle <= 0) {
-    throw new TypeError(`Decision head handle must be a positive integer, got ${String(handle)}.`);
+    throw invalidDecisionArgument(`Decision head handle must be a positive integer, got ${String(handle)}.`);
   }
   return handle;
 }
 function decisionIntegerList(value, label) {
   const isList = Array.isArray(value) || ArrayBuffer.isView(value) && !(value instanceof DataView);
   if (!isList) {
-    throw new TypeError(`${label} must be an array or typed array of integers.`);
+    throw invalidDecisionArgument(`${label} must be an array or typed array of integers.`);
   }
   const list = value;
   const out = new Int32Array(list.length);
   for (let index = 0; index < list.length; index += 1) {
     const item = list[index];
     if (!isInt32(item)) {
-      throw new TypeError(`${label}[${index}] is ${String(item)}; expected a 32-bit integer.`);
+      throw invalidDecisionArgument(`${label}[${index}] is ${String(item)}; expected a 32-bit integer.`);
     }
     out[index] = item;
   }
@@ -476,18 +619,18 @@ function decisionIntegerList(value, label) {
 }
 function normalizeDecisionSequences(sequences) {
   if (!Array.isArray(sequences)) {
-    throw new TypeError("Decision sequences must be an array.");
+    throw invalidDecisionArgument("Decision sequences must be an array.");
   }
   return sequences.map((sequence, index) => {
     const label = `Decision sequence ${index}`;
     if (!sequence || typeof sequence !== "object") {
-      throw new TypeError(`${label} must be an object with tokens, markers and questionType.`);
+      throw invalidDecisionArgument(`${label} must be an object with tokens, markers and questionType.`);
     }
     const tokens = decisionIntegerList(sequence.tokens, `${label} tokens`);
     const markers = decisionIntegerList(sequence.markers, `${label} markers`);
     const questionType = sequence.questionType;
     if (!isInt32(questionType)) {
-      throw new TypeError(
+      throw invalidDecisionArgument(
         `${label} questionType is ${String(questionType)}; expected 0 (choice), 1 (score) or 2 (noul).`
       );
     }
@@ -518,7 +661,7 @@ function encodeDecisionSequences(sequences) {
   return bytes;
 }
 function decodeDecisionOutputs(bytes, count) {
-  const malformed = () => new Error("Decision output from the WebGPU core is malformed.");
+  const malformed = () => decisionError("inference", "Decision output from the WebGPU core is malformed.");
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let offset = 0;
   const floats = (length) => {
@@ -1158,74 +1301,6 @@ function scoredTokensFrom(entries) {
     bytes: Uint8Array.from(Array.isArray(entry?.bytes) ? entry.bytes : []),
     logprob: typeof entry?.logprob === "number" ? entry.logprob : -Infinity
   }));
-}
-
-// js/src/internal/text.ts
-function buildPromptFromMessages(messages, addAssistant) {
-  const lines = [];
-  for (const msg of messages || []) {
-    const role = String(msg?.role ?? "user");
-    const content = String(msg?.content ?? "");
-    lines.push(`${role}: ${content}`);
-  }
-  if (addAssistant) {
-    lines.push("assistant: ");
-  }
-  return lines.join("\n");
-}
-function looksLikeCorruptedGeneration(text) {
-  if (typeof text !== "string" || text.length === 0) {
-    return false;
-  }
-  const normalized = text.trim();
-  if (normalized.length === 0) {
-    return false;
-  }
-  const unusedTokens = text.match(/<unused\d+>/g) || [];
-  if (unusedTokens.length >= 4) {
-    return true;
-  }
-  const tokenLikeTags = text.match(/<[^>]{1,40}>/g) || [];
-  if (tokenLikeTags.length >= 8) {
-    return true;
-  }
-  const compact = text.replace(/\s+/g, "");
-  if (compact.length === 0) {
-    return false;
-  }
-  const tagRun = compact.match(/(?:<[^>]{2,32}>){6,}/);
-  if (tagRun) {
-    return true;
-  }
-  const alphaNum = (normalized.match(/[A-Za-z0-9]/g) || []).length;
-  const printable = (normalized.match(/[\x20-\x7E]/g) || []).length;
-  const angleBrackets = (normalized.match(/[<>]/g) || []).length;
-  const alphaNumRatio = alphaNum / normalized.length;
-  const printableRatio = printable / normalized.length;
-  const bracketRatio = angleBrackets / normalized.length;
-  if (normalized.length >= 24 && printableRatio > 0.95 && alphaNumRatio < 0.18) {
-    return true;
-  }
-  if (normalized.length >= 24 && bracketRatio > 0.25) {
-    return true;
-  }
-  return false;
-}
-function trimUnstableUtf8Tail(text) {
-  if (typeof text !== "string" || text.length === 0) {
-    return "";
-  }
-  let end = text.length;
-  while (end > 0 && text.charCodeAt(end - 1) === 65533) {
-    end -= 1;
-  }
-  if (end > 0) {
-    const tail = text.charCodeAt(end - 1);
-    if (tail >= 55296 && tail <= 56319) {
-      end -= 1;
-    }
-  }
-  return end === text.length ? text : text.slice(0, end);
 }
 
 // js/src/runtime.ts
@@ -3658,29 +3733,30 @@ var LlamaWebGpuBridgeRuntime = class {
   }
   async loadDecisionHead(source, options = {}) {
     if (!this._core || this._modelBytes <= 0) {
-      throw new Error("No model loaded. Call loadModelFromUrl first.");
+      throw decisionError("no-model", "No model loaded. Call loadModelFromUrl first.");
     }
     const configJson = options?.configJson ?? null;
     if (configJson !== null && typeof configJson !== "string") {
-      throw new TypeError("Decision head configJson must be a string.");
+      throw invalidDecisionArgument("Decision head configJson must be a string.");
     }
     let bytes = null;
     if (typeof source === "string") {
       if (source.length === 0) {
-        throw new Error("Decision head URL is empty.");
+        throw decisionError("invalid-argument", "Decision head URL is empty.");
       }
     } else {
       bytes = bufferSourceBytes(source);
       if (!bytes) {
-        throw new TypeError("Decision head source must be a URL string, an ArrayBuffer or a typed array.");
+        throw invalidDecisionArgument("Decision head source must be a URL string, an ArrayBuffer or a typed array.");
       }
       if (bytes.byteLength === 0) {
-        throw new Error("Decision head bytes are empty.");
+        throw decisionError("invalid-argument", "Decision head bytes are empty.");
       }
     }
     const capabilities = this.getDecisionCapabilities();
     if (capabilities.supported !== true) {
-      throw new Error(
+      throw decisionError(
+        "unsupported",
         capabilities.reason || "The loaded model does not support decision heads."
       );
     }
@@ -3694,8 +3770,12 @@ var LlamaWebGpuBridgeRuntime = class {
       if (bytes) {
         core.FS.writeFile(headPath, bytes);
       } else {
-        label = basenameFromUrl(source).slice(0, 256);
-        await this._stageDecisionHeadFromUrl(source, headPath, options?.onProgress);
+        label = basenameFromUrl(source).replaceAll("\0", "%00").slice(0, 256);
+        try {
+          await this._stageDecisionHeadFromUrl(source, headPath, options?.onProgress);
+        } catch (error) {
+          throw error && typeof error === "object" ? withDecisionErrorCode(error, "model") : error;
+        }
       }
       if (configPath !== null) {
         core.FS.writeFile(configPath, textEncoder.encode(configJson));
@@ -3710,7 +3790,10 @@ var LlamaWebGpuBridgeRuntime = class {
         )
       );
       if (handle <= 0) {
-        throw new Error(this._coreErrorMessage("Failed to load decision head", handle));
+        throw decisionError(
+          decisionCoreStatusCode(handle),
+          this._coreErrorMessage("Failed to load decision head", handle)
+        );
       }
       const raw = core.ccall(
         "llamadart_webgpu_decision_head_info_json",
@@ -3728,7 +3811,7 @@ var LlamaWebGpuBridgeRuntime = class {
     const nativeHandle = decisionHandleFrom(handle);
     const input = encodeDecisionSequences(sequences);
     if (!this._core || this._modelBytes <= 0) {
-      throw new Error("No model loaded. Call loadModelFromUrl first.");
+      throw decisionError("no-model", "No model loaded. Call loadModelFromUrl first.");
     }
     const core = this._core;
     this._ensureDecisionDir();
@@ -3747,7 +3830,10 @@ var LlamaWebGpuBridgeRuntime = class {
         )
       );
       if (count < 0) {
-        throw new Error(this._coreErrorMessage("Decision run failed", count));
+        throw decisionError(
+          decisionCoreStatusCode(count),
+          this._coreErrorMessage("Decision run failed", count)
+        );
       }
       return decodeDecisionOutputs(core.FS.readFile(outputPath), count);
     } finally {
@@ -4188,6 +4274,11 @@ var LlamaWebGpuBridgeRuntime = class {
     }
     const sampling = resolveCompletionSamplingOptions(options);
     requireCompletionCapabilities(sampling, this.getCompletionCapabilities());
+    const input = this._coreText(
+      String(prompt),
+      "llamadart_webgpu_begin_generation_bytes",
+      "llamadart_webgpu_begin_generation"
+    );
     this._abortRequested = false;
     const startedAt = performance.now();
     let firstTokenAt = null;
@@ -4205,7 +4296,7 @@ var LlamaWebGpuBridgeRuntime = class {
     const topK = Number.isFinite(options.topK) ? Number(options.topK) : 40;
     const topP = Number.isFinite(options.topP) ? Number(options.topP) : 0.95;
     const penalty = Number.isFinite(options.penalty) ? Number(options.penalty) : 1.1;
-    const grammar = typeof options.grammar === "string" && options.grammar.length > 0 ? options.grammar : null;
+    const grammar = typeof options.grammar === "string" ? options.grammar : null;
     const seed = Number.isInteger(options.seed) ? Number(options.seed) : Math.floor(Math.random() * 4294967295);
     await this._stageMultimodalParts(options.parts, options);
     let generationStarted = false;
@@ -4216,10 +4307,10 @@ var LlamaWebGpuBridgeRuntime = class {
       }
       const beginRc = Number(
         await this._core.ccall(
-          "llamadart_webgpu_begin_generation",
+          input.exportName,
           "number",
           [
-            "string",
+            ...input.argTypes,
             "number",
             "number",
             "number",
@@ -4231,10 +4322,11 @@ var LlamaWebGpuBridgeRuntime = class {
             "number",
             "string",
             "string",
-            "string"
+            "string",
+            "number"
           ],
           [
-            String(prompt),
+            ...input.args,
             temp,
             topK,
             topP,
@@ -4246,7 +4338,8 @@ var LlamaWebGpuBridgeRuntime = class {
             sampling.thinkingBudget?.maxTokens ?? 0,
             sampling.thinkingBudget?.startTag ?? null,
             sampling.thinkingBudget?.endTag ?? null,
-            sampling.thinkingBudget?.forcedMessage ?? null
+            sampling.thinkingBudget?.forcedMessage ?? null,
+            sampling.penaltyPromptTokens ? 0 : 1
           ],
           { async: true }
         )
@@ -4400,12 +4493,13 @@ var LlamaWebGpuBridgeRuntime = class {
     if (this._modelBytes <= 0) {
       throw new Error("No model loaded. Call loadModelFromUrl first.");
     }
+    const input = this._coreText(String(text), "llamadart_webgpu_tokenize_bytes_to_json", "llamadart_webgpu_tokenize_to_json");
     const rc = Number(
       await this._core.ccall(
-        "llamadart_webgpu_tokenize_to_json",
+        input.exportName,
         "number",
-        ["string", "number"],
-        [String(text), _addSpecial ? 1 : 0],
+        [...input.argTypes, "number"],
+        [...input.args, _addSpecial ? 1 : 0],
         { async: true }
       )
     );
@@ -4532,6 +4626,21 @@ var LlamaWebGpuBridgeRuntime = class {
     }
     return this._core.ccall("llamadart_webgpu_last_detokenized", "string", [], []) || "";
   }
+  // A 'string' ccall argument reaches the core as a C string, which ends at the
+  // first U+0000, so text goes as UTF-8 bytes and a length when the core can
+  // take them. An older core would silently drop the rest of the text.
+  _coreText(text, bytesExport, stringExport) {
+    if (typeof this._core[`_${bytesExport}`] === "function") {
+      const bytes = textEncoder.encode(text);
+      return { exportName: bytesExport, argTypes: ["array", "number"], args: [bytes, bytes.length] };
+    }
+    if (text.includes("\0")) {
+      throw new Error(
+        `Text contains U+0000, which this core cannot read: it lacks ${bytesExport}. Use the core from the same bridge release.`
+      );
+    }
+    return { exportName: stringExport, argTypes: ["string"], args: [text] };
+  }
   // Core text as raw bytes: a 'string' ccall hand-decodes 16 bytes or fewer
   // and turns an incomplete or invalid UTF-8 sequence into wrong but valid
   // code points instead of U+FFFD.
@@ -4596,12 +4705,13 @@ var LlamaWebGpuBridgeRuntime = class {
       throw new Error("No model loaded. Call loadModelFromUrl first.");
     }
     const normalize = options?.normalize !== false;
+    const input = this._coreText(String(text), "llamadart_webgpu_embed_bytes_to_json", "llamadart_webgpu_embed_to_json");
     const rc = Number(
       await this._core.ccall(
-        "llamadart_webgpu_embed_to_json",
+        input.exportName,
         "number",
-        ["string", "number"],
-        [String(text), normalize ? 1 : 0],
+        [...input.argTypes, "number"],
+        [...input.args, normalize ? 1 : 0],
         { async: true }
       )
     );
@@ -4644,12 +4754,17 @@ var LlamaWebGpuBridgeRuntime = class {
       throw new TypeError(`Next-token topK is ${String(topK)}; expected a 32-bit integer.`);
     }
     const reusePromptPrefix = options?.reusePromptPrefix !== false;
+    const input = this._coreText(
+      prompt,
+      "llamadart_webgpu_score_next_token_bytes_to_json",
+      "llamadart_webgpu_score_next_token_to_json"
+    );
     const rc = Number(
       await this._core.ccall(
-        "llamadart_webgpu_score_next_token_to_json",
+        input.exportName,
         "number",
-        ["string", "string", "number", "number"],
-        [prompt, JSON.stringify(candidates), topK, reusePromptPrefix ? 1 : 0],
+        [...input.argTypes, "string", "number", "number"],
+        [...input.args, JSON.stringify(candidates), topK, reusePromptPrefix ? 1 : 0],
         { async: true }
       )
     );
@@ -4951,6 +5066,9 @@ var BridgeWorkerProxy = class {
       if (type === "error") {
         const errorMessage = String(message.message || "Worker request failed");
         const workerError = message.embeddingErrorCode ? new EmbeddingError(message.embeddingErrorCode, errorMessage) : new Error(errorMessage);
+        if (isDecisionErrorCode(message.decisionErrorCode)) {
+          withDecisionErrorCode(workerError, message.decisionErrorCode);
+        }
         if (message.state && typeof message.state === "object") {
           workerError.state = message.state;
         }
@@ -5365,7 +5483,7 @@ var LlamaWebGpuBridge = class {
     const abortError = () => createAbortError(abortMessage);
     const lifecycleState = this._lifecycleState || (this._disposed ? "disposed" : "open");
     if (!allowDisposed && (this._disposed || lifecycleState !== "open")) {
-      return Promise.reject(new Error(BRIDGE_DISPOSED_MESSAGE));
+      return Promise.reject(bridgeDisposedError());
     }
     if (signal?.aborted) {
       return Promise.reject(abortError());
@@ -5421,7 +5539,7 @@ var LlamaWebGpuBridge = class {
       }
       if (!allowDisposed && (this._disposed || this._lifecycleState === "disposing")) {
         operation.state = "disposed";
-        throw new Error(BRIDGE_DISPOSED_MESSAGE);
+        throw bridgeDisposedError();
       }
       started = true;
       removeDisposalWaiter?.();
@@ -5492,7 +5610,7 @@ var LlamaWebGpuBridge = class {
         removeDisposalWaiter = this._addDisposalWaiter(() => {
           if (!started) {
             operation.state = "disposed";
-            reject(new Error(BRIDGE_DISPOSED_MESSAGE));
+            reject(bridgeDisposedError());
           }
         });
       }
@@ -5530,10 +5648,10 @@ var LlamaWebGpuBridge = class {
    */
   _throwIfDisposed() {
     if (this._lifecycleState === "disposed") {
-      throw new Error(BRIDGE_DISPOSED_MESSAGE);
+      throw bridgeDisposedError();
     }
     if ((this._disposed || this._lifecycleState === "disposing") && !this._isSettleFirstOwner()) {
-      throw new Error(BRIDGE_DISPOSED_MESSAGE);
+      throw bridgeDisposedError();
     }
   }
   _notifyDisposalWaiters() {
@@ -5822,7 +5940,9 @@ var LlamaWebGpuBridge = class {
    * still holds that model, but the fresh worker would answer every request
    * with "No model loaded" or without the adapters. Reload them first, and
    * again on the next call if this fails. A failure here reaches the caller's
-   * own worker-error handling.
+   * own worker-error handling. Frees and unloads skip it: the core accepts
+   * them without a model, and the facade forgets what they release, so the
+   * next restore skips it too. The chat template never reads the model.
    */
   async _restoreWorkerModelIfMissing() {
     if (!this._workerProxy || this._workerModelMissing !== true || !hasModelSource(this._loadedModelUrl)) {
@@ -5989,7 +6109,7 @@ var LlamaWebGpuBridge = class {
       await this._ensureRuntimeDraftModel();
     } catch (error) {
       if (this._disposed || this._lifecycleState === "disposing") {
-        throw new Error(BRIDGE_DISPOSED_MESSAGE);
+        throw bridgeDisposedError();
       }
       if (error?.name === "AbortError") {
         throw error;
@@ -6894,6 +7014,12 @@ var LlamaWebGpuBridge = class {
     }
   }
   async synthesizeSpeech(options = {}) {
+    for (const field of ["text", "language"]) {
+      const value = options?.[field];
+      if (typeof value === "string") {
+        withoutNul(value, `TextToSpeechOptions.${field}`);
+      }
+    }
     return this._runExclusive(
       () => this._synthesizeSpeechUnlocked(options),
       {
@@ -6979,7 +7105,8 @@ var LlamaWebGpuBridge = class {
     return this._workerProxy || this._runtime || null;
   }
   _staleDecisionHeadError(handle) {
-    return new Error(
+    return decisionError(
+      "head-lost",
       `Decision head ${handle} is not loaded; it was freed, its model was unloaded, or the bridge runtime restarted. Load the decision head again.`
     );
   }
@@ -6996,9 +7123,20 @@ var LlamaWebGpuBridge = class {
     }
     return entry;
   }
+  // Gives every decision API rejection a DecisionErrorCode.
+  _decisionRejection(error) {
+    if (decisionErrorCodeOf(error)) {
+      return error;
+    }
+    if (!error || typeof error !== "object") {
+      return decisionError("runtime", serializeWorkerError(error));
+    }
+    const cancelled = error.name === "AbortError" && !this._isWorkerTimeoutError(error);
+    return withDecisionErrorCode(error, cancelled ? "cancelled" : "runtime");
+  }
   _requireDecisionRuntime() {
     if (!this._runtime) {
-      throw new Error("No model loaded. Call loadModelFromUrl first.");
+      throw decisionError("no-model", "No model loaded. Call loadModelFromUrl first.");
     }
     return this._runtime;
   }
@@ -7016,13 +7154,16 @@ var LlamaWebGpuBridge = class {
     return this._runExclusive(
       () => this._getDecisionCapabilitiesUnlocked(),
       { kind: "decision-capabilities" }
-    );
+    ).catch((error) => {
+      throw this._decisionRejection(error);
+    });
   }
   async _getDecisionCapabilitiesUnlocked() {
     if (!this._workerProxy) {
       return this._runtime ? this._runtime.getDecisionCapabilities() : { apiVersion: DECISION_API_VERSION, supported: false, reason: "WebGPU core is not initialized" };
     }
     try {
+      await this._restoreWorkerModelIfMissing();
       return await this._callWorker("getDecisionCapabilities", []);
     } catch (error) {
       this._throwIfOperationCancelled(error, "Decision capability probe was cancelled.");
@@ -7037,7 +7178,9 @@ var LlamaWebGpuBridge = class {
     return this._runExclusive(
       () => this._loadDecisionHeadUnlocked(source, options),
       { kind: "decision-head-load" }
-    );
+    ).catch((error) => {
+      throw this._decisionRejection(error);
+    });
   }
   async _loadDecisionHeadUnlocked(source, options = {}) {
     const loadInRuntime = async () => {
@@ -7090,7 +7233,9 @@ var LlamaWebGpuBridge = class {
     return this._runExclusive(
       () => this._runDecisionUnlocked(handle, sequences),
       { kind: "decision-run" }
-    );
+    ).catch((error) => {
+      throw this._decisionRejection(error);
+    });
   }
   async _runDecisionUnlocked(handle, sequences) {
     const entry = this._resolveDecisionHead(handle);
@@ -7102,6 +7247,7 @@ var LlamaWebGpuBridge = class {
       return this._requireDecisionRuntime().runDecision(entry.handle, normalized);
     }
     try {
+      await this._restoreWorkerModelIfMissing();
       return await this._callWorker("runDecision", [entry.handle, normalized]);
     } catch (error) {
       this._throwIfOperationCancelled(error, "Decision run was cancelled.");
@@ -7110,7 +7256,8 @@ var LlamaWebGpuBridge = class {
       }
       this._decisionHeadMap().delete(handle);
       await this._recoverWorkerOnMainThread(error);
-      throw new Error(
+      throw decisionError(
+        "head-lost",
         `Decision head ${handle} was lost when the bridge worker failed (${serializeWorkerError(error)}). Load the decision head again.`
       );
     }
@@ -7119,7 +7266,9 @@ var LlamaWebGpuBridge = class {
     return this._runExclusive(
       () => this._freeDecisionHeadUnlocked(handle),
       { kind: "decision-head-free" }
-    );
+    ).catch((error) => {
+      throw this._decisionRejection(error);
+    });
   }
   async _freeDecisionHeadUnlocked(handle) {
     const entry = this._resolveDecisionHead(handle);
@@ -7819,11 +7968,13 @@ function installBridgeWorkerHost() {
     } catch (_) {
       state = void 0;
     }
+    const decisionErrorCode = decisionErrorCodeOf(error);
     self.postMessage({
       type: "error",
       id,
       message: serializeWorkerError(error),
       ...error instanceof EmbeddingError ? { embeddingErrorCode: error.code } : {},
+      ...decisionErrorCode ? { decisionErrorCode } : {},
       state
     });
   };
