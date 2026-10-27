@@ -5,8 +5,8 @@
       "size_bytes": 21934
     },
     "llama_webgpu_bridge.js": {
-      "sha256": "3c13846da8a3fc258d72308fc0c8e36929cf2c0304812d6259f868a17d5c84ba",
-      "size_bytes": 312231
+      "sha256": "35ab661820d2c74e23b03bfe61970660398709ce7a508a4ec803ab4feab1e27f",
+      "size_bytes": 312346
     },
     "llama_webgpu_bridge_worker.js": {
       "sha256": "47bbfa0fe897e708455b9497e9aa41d2e94489c329300c33b12936fb3169deca",
@@ -30,8 +30,8 @@
     }
   },
   "assets_repository": "leehack/llama-web-bridge-assets",
-  "bridge_assets_tag": "v0.1.75",
-  "bridge_commit": "b19808c72732a3cf27496f609e1fb7c8cac886ef",
+  "bridge_assets_tag": "v0.1.76",
+  "bridge_commit": "883376ddfae4f8d70b1970fa7d180217475aab58",
   "bridge_repository": "leehack/llama-web-bridge",
   "capabilities": {
     "memory64": true,
@@ -66,8 +66,8 @@
       "size_bytes": 21934
     },
     "llama_webgpu_bridge.js": {
-      "sha256": "3c13846da8a3fc258d72308fc0c8e36929cf2c0304812d6259f868a17d5c84ba",
-      "size_bytes": 312231
+      "sha256": "35ab661820d2c74e23b03bfe61970660398709ce7a508a4ec803ab4feab1e27f",
+      "size_bytes": 312346
     },
     "llama_webgpu_bridge_worker.js": {
       "sha256": "47bbfa0fe897e708455b9497e9aa41d2e94489c329300c33b12936fb3169deca",
@@ -90,15 +90,15 @@
       "size_bytes": 10516385
     }
   },
-  "github_run_id": "40487406584",
-  "github_run_url": "https://github.com/leehack/llama-web-bridge/actions/runs/40487406584",
+  "github_run_id": "40581287345",
+  "github_run_url": "https://github.com/leehack/llama-web-bridge/actions/runs/40581287345",
   "llama_cpp_commit": "620d2225cc436ab0b001e3200e590e3b286ef9ab",
   "llama_cpp_tag": "v0.7.0",
   "native_commit": "298314bd0ff4650363e0e63b81399d5618869a63",
   "native_manifest_sha256": "92b9f1ea6d3ec3dd826122ffde3cf21b2b22036c368e826d86e927284c6908f4",
   "native_release_tag": "v0.7.0-2",
   "native_repository": "leehack/llamadart-native",
-  "orchestrator_correlation_id": "auto-stable-v0.7.0-2-92b9f1ea6d3ec3dd-build-b19808c72732a3cf",
+  "orchestrator_correlation_id": "auto-stable-v0.7.0-2-92b9f1ea6d3ec3dd-build-883376ddfae4f8d7",
   "qualification_gates": {
     "multimodal": "passed",
     "speech_to_text": "required-automated-qualification",
@@ -107,9 +107,9 @@
   },
   "release_channel": "stable",
   "release_rebuild": 0,
-  "release_tag": "v0.1.75",
+  "release_tag": "v0.1.76",
   "schema_version": 2,
-  "source_commit": "b19808c72732a3cf27496f609e1fb7c8cac886ef",
+  "source_commit": "883376ddfae4f8d70b1970fa7d180217475aab58",
   "source_repository": "leehack/llama-web-bridge",
   "unproven_capabilities": {
     "hardware_gpu_acceleration": "unavailable-on-hosted-runners",
