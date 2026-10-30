@@ -13,24 +13,24 @@
       "size_bytes": 257
     },
     "llama_webgpu_core.js": {
-      "sha256": "1c2b609fddb5822562b0f12d3c13263bee385b3d706baa127721b0a23b1430dc",
+      "sha256": "d693784e27432485fc9732891c03ce113099b32aeb4bd8e0a0ba3d0320f52bc9",
       "size_bytes": 123402
     },
     "llama_webgpu_core.wasm": {
-      "sha256": "934a81113e5f25ccea2201af435ab6270686bf87ed04391ec44c87651bed609a",
-      "size_bytes": 10235001
+      "sha256": "f9a81ecb3f5720f1da8b634712c53e94a38680308ca4587c0d5a453337f8f273",
+      "size_bytes": 10645196
     },
     "llama_webgpu_core_mem64.js": {
-      "sha256": "fd18aab61e55de167382f0d1e7cd8c4a5947e47115efe306e54901c545b433f8",
-      "size_bytes": 146669
+      "sha256": "282d0934ec2090b13f527e1f01d5740374bdfcc1e75c1f46f9148e7007976a0b",
+      "size_bytes": 147159
     },
     "llama_webgpu_core_mem64.wasm": {
-      "sha256": "80a107d5511dd6b079ceea2f660e35753056934c2748994383423f26217ae44e",
-      "size_bytes": 10516385
+      "sha256": "5b57ab7ac36ed5c7b8f569a2e39be11dd598d66cc790c8231eef155de416e339",
+      "size_bytes": 10926272
     }
   },
   "assets_repository": "leehack/llama-web-bridge-assets",
-  "bridge_assets_tag": "v0.1.78",
+  "bridge_assets_tag": "v0.1.79",
   "bridge_commit": "fe1b70c86eb96f2932a50606e50583dff1222128",
   "bridge_repository": "leehack/llama-web-bridge",
   "capabilities": {
@@ -74,31 +74,31 @@
       "size_bytes": 257
     },
     "llama_webgpu_core.js": {
-      "sha256": "1c2b609fddb5822562b0f12d3c13263bee385b3d706baa127721b0a23b1430dc",
+      "sha256": "d693784e27432485fc9732891c03ce113099b32aeb4bd8e0a0ba3d0320f52bc9",
       "size_bytes": 123402
     },
     "llama_webgpu_core.wasm": {
-      "sha256": "934a81113e5f25ccea2201af435ab6270686bf87ed04391ec44c87651bed609a",
-      "size_bytes": 10235001
+      "sha256": "f9a81ecb3f5720f1da8b634712c53e94a38680308ca4587c0d5a453337f8f273",
+      "size_bytes": 10645196
     },
     "llama_webgpu_core_mem64.js": {
-      "sha256": "fd18aab61e55de167382f0d1e7cd8c4a5947e47115efe306e54901c545b433f8",
-      "size_bytes": 146669
+      "sha256": "282d0934ec2090b13f527e1f01d5740374bdfcc1e75c1f46f9148e7007976a0b",
+      "size_bytes": 147159
     },
     "llama_webgpu_core_mem64.wasm": {
-      "sha256": "80a107d5511dd6b079ceea2f660e35753056934c2748994383423f26217ae44e",
-      "size_bytes": 10516385
+      "sha256": "5b57ab7ac36ed5c7b8f569a2e39be11dd598d66cc790c8231eef155de416e339",
+      "size_bytes": 10926272
     }
   },
-  "github_run_id": "41039545895",
-  "github_run_url": "https://github.com/leehack/llama-web-bridge/actions/runs/41039545895",
-  "llama_cpp_commit": "620d2225cc436ab0b001e3200e590e3b286ef9ab",
-  "llama_cpp_tag": "v0.7.0",
-  "native_commit": "7b5221306764d860ba5cbeae59e941f5aeb46d15",
-  "native_manifest_sha256": "d60a4c9051df08116d787326e932cbb0b055de922ec4cdae2bab8472f12932fd",
-  "native_release_tag": "v0.7.0-3",
+  "github_run_id": "41061036621",
+  "github_run_url": "https://github.com/leehack/llama-web-bridge/actions/runs/41061036621",
+  "llama_cpp_commit": "8642541b255bfb5dc39cd351a178be09013a55d6",
+  "llama_cpp_tag": "v0.8.0",
+  "native_commit": "b7aa5a24ba7b7522e8754440d0289eb0a9ba43ec",
+  "native_manifest_sha256": "2f37360a4602334416ec097279d1554c93f70628f00beab202c42c33018340db",
+  "native_release_tag": "v0.8.0",
   "native_repository": "leehack/llamadart-native",
-  "orchestrator_correlation_id": "auto-stable-v0.7.0-3-d60a4c9051df0811-build-fe1b70c86eb96f29",
+  "orchestrator_correlation_id": "auto-stable-v0.8.0-2f37360a46023344-build-fe1b70c86eb96f29",
   "qualification_gates": {
     "multimodal": "passed",
     "speech_to_text": "required-automated-qualification",
@@ -107,7 +107,7 @@
   },
   "release_channel": "stable",
   "release_rebuild": 0,
-  "release_tag": "v0.1.78",
+  "release_tag": "v0.1.79",
   "schema_version": 2,
   "source_commit": "fe1b70c86eb96f2932a50606e50583dff1222128",
   "source_repository": "leehack/llama-web-bridge",
@@ -118,7 +118,7 @@
     "speaker_reference_fidelity": "unproven",
     "wasm32_text_to_speech": "unsupported"
   },
-  "upstream_commit": "620d2225cc436ab0b001e3200e590e3b286ef9ab",
+  "upstream_commit": "8642541b255bfb5dc39cd351a178be09013a55d6",
   "upstream_repository": "ggml-org/llama.cpp",
-  "upstream_tag": "v0.7.0"
+  "upstream_tag": "v0.8.0"
 }
