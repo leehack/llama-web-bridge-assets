@@ -30,7 +30,7 @@
     }
   },
   "assets_repository": "leehack/llama-web-bridge-assets",
-  "bridge_assets_tag": "v0.1.79",
+  "bridge_assets_tag": "v0.1.80",
   "bridge_commit": "fe1b70c86eb96f2932a50606e50583dff1222128",
   "bridge_repository": "leehack/llama-web-bridge",
   "capabilities": {
@@ -90,15 +90,15 @@
       "size_bytes": 10926272
     }
   },
-  "github_run_id": "41061036621",
-  "github_run_url": "https://github.com/leehack/llama-web-bridge/actions/runs/41061036621",
+  "github_run_id": "41298442959",
+  "github_run_url": "https://github.com/leehack/llama-web-bridge/actions/runs/41298442959",
   "llama_cpp_commit": "8642541b255bfb5dc39cd351a178be09013a55d6",
   "llama_cpp_tag": "v0.8.0",
-  "native_commit": "b7aa5a24ba7b7522e8754440d0289eb0a9ba43ec",
-  "native_manifest_sha256": "2f37360a4602334416ec097279d1554c93f70628f00beab202c42c33018340db",
-  "native_release_tag": "v0.8.0",
+  "native_commit": "f950319714bbc5e81e73b39c455dcdc91382f2d1",
+  "native_manifest_sha256": "a546800ba1717f8140c2c4318980240b3416f220831940566be1dc060cfb07f6",
+  "native_release_tag": "v0.8.0-1",
   "native_repository": "leehack/llamadart-native",
-  "orchestrator_correlation_id": "auto-stable-v0.8.0-2f37360a46023344-build-fe1b70c86eb96f29",
+  "orchestrator_correlation_id": "auto-stable-v0.8.0-1-a546800ba1717f81-build-fe1b70c86eb96f29",
   "qualification_gates": {
     "multimodal": "passed",
     "speech_to_text": "required-automated-qualification",
@@ -107,7 +107,7 @@
   },
   "release_channel": "stable",
   "release_rebuild": 0,
-  "release_tag": "v0.1.79",
+  "release_tag": "v0.1.80",
   "schema_version": 2,
   "source_commit": "fe1b70c86eb96f2932a50606e50583dff1222128",
   "source_repository": "leehack/llama-web-bridge",
