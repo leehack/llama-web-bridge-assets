@@ -11,6 +11,8 @@ export interface LlamaWebGpuBridgeConfig {
   coreModuleFactory?: LlamaCoreModuleFactory | Promise<LlamaCoreModuleFactory>;
   /** Set for a `coreModuleUrl` core built without pthreads (`WEBGPU_BRIDGE_PTHREADS=0`): it loads on a page that is not cross-origin isolated, capped to one thread, instead of rejecting with `CrossOriginIsolationError`. */
   allowSingleThreadCore?: boolean;
+  /** Stage fetched model files into a chunked JS-backed WASMFS mount outside wasm linear memory. */
+  jsBackedModelStaging?: boolean;
   workerUrl?: string;
   disableWorker?: boolean;
   preferMemory64?: boolean;
@@ -54,6 +56,10 @@ export interface LoadModelOptions {
   signal?: AbortSignal;
   remoteFetchThresholdBytes?: number;
   remoteFetchChunkBytes?: number;
+  /** Overrides the Safari GPU layer cap. Recognized Safari 27+ is uncapped by default. */
+  safariMaxGpuLayers?: number;
+  /** Set to false to skip the Safari load-time GPU probe. */
+  safariGpuProbe?: boolean;
   /** Load the model's MTP layers, which `draft-mtp` speculative decoding needs. Defaults to false. */
   loadMtp?: boolean;
   /** Rollback snapshots per sequence, llama.cpp's `n_rs_seq`: a model with recurrent state needs at least the draft length for `draft-*` speculative decoding. Defaults to 0. */
@@ -244,7 +250,7 @@ export type GrammarTrigger =
   | { type: 'word' | 'pattern' | 'pattern-full'; value: string }
   | { type: 'token'; token: number };
 
-/** llama.cpp's reasoning budget: after `maxTokens` tokens inside a reasoning block, plus any that finish a UTF-8 character, the sampler forces `forcedMessage` and `endTag`. A grammar pauses after `startTag` until `endTag` completes, unless `pauseGrammar` is false. */
+/** llama.cpp's reasoning budget: after `maxTokens` tokens inside a reasoning block, plus any that finish a UTF-8 character, the sampler forces `forcedMessage` and `endTag`. A grammar pauses after `startTag` until a natural end or the forced close completes, unless `pauseGrammar` is false. */
 export interface ThinkingBudgetOptions {
   /** Integer from 0 to 2147483647. 0 forces the end as soon as a block opens, or at once when the prompt ends inside one. */
   maxTokens: number;
@@ -254,6 +260,10 @@ export interface ThinkingBudgetOptions {
   endTag: string;
   /** Text forced before `endTag` when the budget runs out; empty by default. */
   forcedMessage?: string;
+  /** Complete ordered list of natural ends, including any normal close. Omit to use only `endTag`. Needs `thinkingBudgetMultiEnd`. */
+  naturalEndTags?: string[];
+  /** Index of the natural end that a paused tool grammar must accept when thinking closes. Omit or pass -1 to disable replay. */
+  grammarReplayEndIndex?: number;
   /** `false` keeps `grammar` applied inside a reasoning block, for a grammar that takes the block and `endTag` itself, such as one written for a prompt that ends inside the block; paused, it would resume at its start and take the reply as reasoning. It must accept `forcedMessage` and `endTag` wherever the budget can run out. Omitted, null or true pauses the grammar. Needs the `thinkingBudgetPauseGrammar` capability. */
   pauseGrammar?: boolean | null;
 }
@@ -268,6 +278,8 @@ export interface CompletionCapabilities {
   thinkingBudget: boolean;
   /** `CompletionOptions.thinkingBudget.pauseGrammar` is applied. A core without it pauses every grammar inside a reasoning block. */
   thinkingBudgetPauseGrammar: boolean;
+  /** The core applies ordered natural ends and emits the complete forced close. */
+  thinkingBudgetMultiEnd: boolean;
   /** The penalties count the prompt, and `CompletionOptions.penaltyPromptTokens` is applied. A core without it never counts the prompt, so `penaltyPromptTokens: false` holds there too. */
   penaltyPromptTokens: boolean;
   /** The loaded core applies CompletionOptions.penaltyPromptTokensWithGrammar. Only literal true permits the opt-in. */
@@ -306,6 +318,24 @@ export type CrossOriginIsolationErrorCode = 'CROSS_ORIGIN_ISOLATION_REQUIRED';
 export class CrossOriginIsolationError extends Error {
   code: CrossOriginIsolationErrorCode;
   constructor(message?: string);
+}
+
+/** Thrown when a worker load forces the fetch backend on a single-thread core. */
+export class SingleThreadCoreError extends Error {
+  readonly code: 'SINGLE_THREAD_CORE_UNSUPPORTED';
+  readonly feature: 'remote_fetch_backend';
+  constructor(message?: string);
+}
+
+export type ModelStagingErrorCode =
+  | 'MODEL_STAGING_ALLOCATION_FAILED'
+  | 'MODEL_TENSOR_SIZE_LIMIT_EXCEEDED'
+  | 'MODEL_STAGING_MOUNT_FAILED'
+  | 'MODEL_STAGING_UNSUPPORTED';
+/** Thrown when JS-backed model staging fails, is unsupported by the core, collides on mount, or exceeds the wasm32 4 GiB tensor limit. */
+export class ModelStagingError extends Error {
+  code: ModelStagingErrorCode;
+  constructor(code: ModelStagingErrorCode, message: string);
 }
 
 export interface NextTokenScoreOptions {
