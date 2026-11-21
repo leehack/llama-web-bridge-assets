@@ -11,7 +11,11 @@ export interface LlamaWebGpuBridgeConfig {
   coreModuleFactory?: LlamaCoreModuleFactory | Promise<LlamaCoreModuleFactory>;
   /** Set for a `coreModuleUrl` core built without pthreads (`WEBGPU_BRIDGE_PTHREADS=0`): it loads on a page that is not cross-origin isolated, capped to one thread, instead of rejecting with `CrossOriginIsolationError`. */
   allowSingleThreadCore?: boolean;
-  /** Stage fetched model files into a chunked JS-backed WASMFS mount outside wasm linear memory. */
+  /**
+   * Stage fetched model files in a private WASMFS mount. A single-file GGUF
+   * with a known decoded size and 0 or 1 effective GPU layers is staged once
+   * in the wasm heap and memory-mapped on supported cores. Other loads use JS chunks.
+   */
   jsBackedModelStaging?: boolean;
   workerUrl?: string;
   disableWorker?: boolean;
@@ -56,6 +60,8 @@ export interface LoadModelOptions {
   signal?: AbortSignal;
   remoteFetchThresholdBytes?: number;
   remoteFetchChunkBytes?: number;
+  /** Pass false to keep JS-chunk staging when jsBackedModelStaging is enabled. */
+  useMmap?: boolean;
   /** Overrides the Safari GPU layer cap. Recognized Safari 27+ is uncapped by default. */
   safariMaxGpuLayers?: number;
   /** Set to false to skip the Safari load-time GPU probe. */
@@ -313,6 +319,14 @@ export class EmbeddingError extends Error {
   constructor(code: EmbeddingErrorCode, message: string);
 }
 
+/** A threaded core on another origin could not start its pthread workers from a module blob. */
+export class BlobWorkerBlockedError extends Error {
+  readonly code: 'BLOB_WORKER_BLOCKED';
+  readonly reason: 'csp' | 'unavailable' | 'script';
+  readonly target: 'pthread';
+  constructor(reason: 'csp' | 'unavailable' | 'script', message?: string);
+}
+
 export type CrossOriginIsolationErrorCode = 'CROSS_ORIGIN_ISOLATION_REQUIRED';
 /** Thrown by a load or core init on a page that cannot share memory with workers, before the core starts. */
 export class CrossOriginIsolationError extends Error {
@@ -324,6 +338,12 @@ export class CrossOriginIsolationError extends Error {
 export class SingleThreadCoreError extends Error {
   readonly code: 'SINGLE_THREAD_CORE_UNSUPPORTED';
   readonly feature: 'remote_fetch_backend';
+  constructor(message?: string);
+}
+
+/** Thrown by calls that need a model after a native abort unloaded it, until `loadModelFromUrl` succeeds again. */
+export class ModelUnloadedError extends Error {
+  readonly code: 'MODEL_UNLOADED_AFTER_CORE_ABORT';
   constructor(message?: string);
 }
 
@@ -361,6 +381,12 @@ export interface NextTokenScores {
   promptTokens: number;
 }
 
+/** Thrown when a worker script does not declare streamed PCM support. */
+export class TextToSpeechStreamingUnsupportedError extends Error {
+  readonly code: 'TTS_STREAMING_UNSUPPORTED';
+  constructor();
+}
+
 export interface TextToSpeechCapabilities {
   apiVersion: number;
   supported: boolean;
@@ -368,6 +394,7 @@ export interface TextToSpeechCapabilities {
   capabilities: number;
   supportsLanguage: boolean;
   supportsSpeakerReference: boolean;
+  supportsIncrementalAudio: boolean;
   sampleRate: number;
   channels: number;
   reason: string;
@@ -378,6 +405,12 @@ export interface TextToSpeechProgress {
   promptTokensRemaining: number;
   framesGenerated: number;
   truncated: boolean;
+  /** PCM decoded since the previous chunk, present only with streamAudio. */
+  pcm?: Float32Array;
+  /** Index of the first PCM sample in the utterance. */
+  sampleOffset?: number;
+  sampleRate?: number;
+  channels?: number;
 }
 
 export interface TextToSpeechOptions {
@@ -392,10 +425,13 @@ export interface TextToSpeechOptions {
   temperature?: number;
   seed?: number;
   signal?: AbortSignal;
+  /** Deliver PCM chunks via onProgress, which is required when enabled. */
+  streamAudio?: boolean;
   onProgress?: (progress: TextToSpeechProgress) => void;
 }
 
 export interface TextToSpeechResult {
+  /** Empty with streamAudio. In that case sampleCount is the streamed total. */
   pcm: Float32Array;
   sampleRate: number;
   channels: number;
