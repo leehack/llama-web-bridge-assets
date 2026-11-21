@@ -12,7 +12,10 @@ export interface LlamaWebGpuBridgeConfig {
   /** Set for a `coreModuleUrl` core built without pthreads (`WEBGPU_BRIDGE_PTHREADS=0`): it loads on a page that is not cross-origin isolated, capped to one thread, instead of rejecting with `CrossOriginIsolationError`. */
   allowSingleThreadCore?: boolean;
   /**
-   * Stage fetched model files in a private WASMFS mount. A single-file GGUF
+   * Stage fetched model and projector files in a private WASMFS mount.
+   * Defaults to enabled on WebKit when the core supports it, and disabled
+   * elsewhere. Set false to opt out or true to require a staging-capable core.
+   * A single-file model GGUF
    * with a known decoded size and 0 or 1 effective GPU layers is staged once
    * in the wasm heap and memory-mapped on supported cores. Other loads use JS chunks.
    */
@@ -71,6 +74,18 @@ export interface LoadModelOptions {
   /** Rollback snapshots per sequence, llama.cpp's `n_rs_seq`: a model with recurrent state needs at least the draft length for `draft-*` speculative decoding. Defaults to 0. */
   speculativeRollbackTokenMax?: number;
   [key: string]: unknown;
+}
+
+export interface ModelCacheQueryOptions {
+  /** Cache Storage cache to inspect. Defaults to the bridge's `cacheName`. */
+  cacheName?: string;
+}
+
+export interface MultimodalProjectorLoadOptions {
+  /** Read and store the projector in Cache Storage. Defaults to false. */
+  useCache?: boolean;
+  /** Cache Storage cache to use. Defaults to the bridge's `cacheName`. */
+  cacheName?: string;
 }
 
 /** Options for `loadDraftModel`. */
@@ -534,12 +549,21 @@ export class LlamaWebGpuBridge {
   static supportsSafariAdaptiveGpu: boolean;
   /** `true` when `createCompletion` accepts `onUsage`. Bridges before v0.1.54 lack it; through v0.1.52 their worker mode rejects a function option with a `DataCloneError`. */
   static supportsCompletionUsage: boolean;
+  /** This bridge supports cache queries and opt-in projector caching. */
+  static supportsModelCacheQuery: boolean;
 
   constructor(config?: LlamaWebGpuBridgeConfig);
 
   loadModelFromUrl(url: string | string[], options?: LoadModelOptions): Promise<unknown>;
   prefetchModelToCache(url: string | string[], options?: LoadModelOptions): Promise<unknown>;
   evictModelFromCache(url: string | string[], options?: Record<string, unknown>): Promise<unknown>;
+  /**
+   * Reports whether the named cache holds a committed record for every model URL.
+   * A WebKit manifest or a whole-body entry counts. The query leaves Cache Storage
+   * unchanged and does not consume response bodies or verify individual parts.
+   * A later cache-enabled load can recover missing or damaged parts from the network.
+   */
+  isModelCached(url: string | string[], options?: ModelCacheQueryOptions): Promise<boolean>;
 
   createCompletion(prompt: string, options?: CompletionOptions): Promise<string>;
   getCompletionCapabilities(): Promise<CompletionCapabilities>;
@@ -565,7 +589,7 @@ export class LlamaWebGpuBridge {
   embedBatch(inputs: EmbedInput[], options?: EmbedOptions): Promise<number[][]>;
   scoreNextToken(prompt: string, options?: NextTokenScoreOptions): Promise<NextTokenScores>;
 
-  loadMultimodalProjector(url: string): Promise<unknown>;
+  loadMultimodalProjector(url: string, options?: MultimodalProjectorLoadOptions): Promise<unknown>;
   unloadMultimodalProjector(): Promise<unknown>;
   supportsVision(): boolean;
   supportsAudio(): boolean;
