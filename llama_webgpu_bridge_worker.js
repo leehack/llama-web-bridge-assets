@@ -1652,9 +1652,10 @@ function sumProgressValues(values) {
   return total;
 }
 function createModelTransferLengthError(message) {
-  const error = new Error(message);
-  error.name = "ModelTransferLengthError";
-  return error;
+  return Object.assign(new Error(message), {
+    name: "ModelTransferLengthError",
+    code: "MODEL_TRANSFER_LENGTH_ERROR"
+  });
 }
 function writeDirectChunk(directWriter, chunk, position, onBytesWritten) {
   let offset = 0;
@@ -7425,6 +7426,7 @@ var BridgeWorkerProxy = class {
     this._stopCspWatch = null;
     this.startMode = "direct";
     this._supportsIncrementalAudio = false;
+    this._supportsJsBackedModelStaging = false;
     this.coreRetired = false;
     let workerInitError = null;
     const moduleCandidates = [moduleUrl];
@@ -7482,6 +7484,7 @@ var BridgeWorkerProxy = class {
       const type = message.type;
       if (type === "ready") {
         this._supportsIncrementalAudio = message.supportsIncrementalAudio === true;
+        this._supportsJsBackedModelStaging = message.supportsJsBackedModelStaging === true;
         this._clearReadyTimeout();
         this._endCspWatch();
         this._readyResolve?.();
@@ -7539,6 +7542,12 @@ var BridgeWorkerProxy = class {
     await this._ready;
     if (method === "synthesizeSpeech" && args[0]?.streamAudio === true && !this._supportsIncrementalAudio) {
       throw new TextToSpeechStreamingUnsupportedError();
+    }
+    if ((method === "loadModelFromUrl" || method === "loadMultimodalProjector") && this._config.jsBackedModelStaging === true && !this._supportsJsBackedModelStaging) {
+      throw new ModelStagingError(
+        "MODEL_STAGING_UNSUPPORTED",
+        "The worker did not declare supportsJsBackedModelStaging. The bridge and worker scripts must come from the same release."
+      );
     }
     const id = this._nextId++;
     const timeoutMs = this._resolveRequestTimeoutMs(method, args);
@@ -7705,6 +7714,7 @@ var LlamaWebGpuBridge = class {
   static supportsSafariAdaptiveGpu = LlamaWebGpuBridgeRuntime.supportsSafariAdaptiveGpu === true;
   static supportsCompletionUsage = true;
   static supportsModelCacheQuery = true;
+  static supportsJsBackedModelStaging = true;
   constructor(config = {}) {
     this._config = config;
     this._runtime = null;
@@ -8371,6 +8381,10 @@ var LlamaWebGpuBridge = class {
       return false;
     }
     return error instanceof ModelStagingError || error.name === "ModelStagingError";
+  }
+  _isNonRetryableLoadError(error) {
+    const loadError = error;
+    return loadError?.name === "ModelTransferLengthError" || loadError?.code === "MODEL_TRANSFER_LENGTH_ERROR" || this._isNonRecoverableStagingError(error);
   }
   _isRecoverableWorkerFsError(error) {
     if (isCoreRetiredError(error) || error instanceof SingleThreadCoreError || this._isNonRecoverableStagingError(error)) {
@@ -9488,7 +9502,7 @@ var LlamaWebGpuBridge = class {
     } catch (error) {
       this._throwIfOperationCancelled(error, "Projector operation was cancelled.");
       this._throwIfWorkerCoreRetired(error);
-      if (!startedWithWorker || this._isNonRecoverableStagingError(error)) {
+      if (!startedWithWorker || this._isNonRetryableLoadError(error)) {
         throw error;
       }
       const reason = serializeWorkerError(error);
@@ -9506,7 +9520,7 @@ var LlamaWebGpuBridge = class {
           );
           return retryResult;
         } catch (retryError) {
-          if (this._isNonRecoverableStagingError(retryError)) {
+          if (this._isNonRetryableLoadError(retryError)) {
             throw retryError;
           }
           const retryReason = serializeWorkerError(retryError);
@@ -10771,11 +10785,12 @@ function installBridgeWorkerHost() {
     } catch (_) {
       state = void 0;
     }
+    const message = error instanceof Error ? error.message || error.name || "Worker request failed" : serializeWorkerError(error);
     const decisionErrorCode = decisionErrorCodeOf(error);
     self.postMessage({
       type: "error",
       id,
-      message: serializeWorkerError(error),
+      message,
       ...error instanceof EmbeddingError ? { embeddingErrorCode: error.code } : {},
       ...error instanceof CrossOriginIsolationError || error instanceof SingleThreadCoreError || error instanceof ModelUnloadedError ? { errorCode: error.code } : {},
       ...error instanceof Error && error.name === "ModelTransferLengthError" ? { errorCode: "MODEL_TRANSFER_LENGTH_ERROR" } : {},
@@ -10799,7 +10814,11 @@ function installBridgeWorkerHost() {
           disableWorker: true
         });
         bridge._onCoreRetired = () => self.postMessage({ type: "core-retired" });
-        self.postMessage({ type: "ready", supportsIncrementalAudio: true });
+        self.postMessage({
+          type: "ready",
+          supportsIncrementalAudio: true,
+          supportsJsBackedModelStaging: true
+        });
         return;
       }
       if (type !== "call") {
